@@ -1,0 +1,9 @@
+# 绝对不要上传密钥
+openclaw.json
+config.json
+.env
+*.key
+*.secret
+
+# 系统文件
+.DS_Store
