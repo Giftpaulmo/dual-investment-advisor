@@ -1,22 +1,24 @@
-# 🎯 Dual Investment Advisor — 双币赢智能顾问
+# 🎯 Dual Investment Advisor — 双币赢智能顾问 v3.0
 
-> 结合 Polymarket 预测概率 + Deribit 期权预警 + 宏观事件风控，为币安双币赢用户提供数据驱动的策略建议。
+> 在尽可能安全的情况下，帮你多赚钱。
 
-**一句话说明：** 不是展示数据的仪表盘，而是直接告诉你"买哪个行权价、为什么、现在安不安全"。
+结合 Polymarket 预测概率 + Deribit 期权预警 + 宏观事件风控，为币安双币赢用户提供数据驱动的策略建议。
+
+**核心逻辑：用 Polymarket 概率确定"安全区"，在安全区里选 APR 最高的产品。**
 
 ---
 
-## 这个 Skill 解决什么问题
+## 这个工具解决什么问题
 
 你在币安买双币赢的时候，面对一堆行权价和 APR，怎么选？
 
-大多数人靠感觉：APR 高的看着爽就买了。但 APR 高 = 被行权风险高，你可能不知道自己在赌什么。
+大多数人靠感觉：APR 高的看着爽就买了。但 APR 高 = 被行权风险高，极容易反复穿仓被"频繁收割"。
 
-这个 Skill 帮你做三件事：
+这个工具帮你做三件事：
 
-1. **量化"安全"到底有多安全** — 用 Polymarket 真金白银投票的概率告诉你，BTC 跌到某个价位的概率到底是多少
-2. **提前预警波动风险** — Deribit 大型期权到期、CPI/非农/FOMC 等宏观事件，自动搜索并提醒
-3. **直接推荐+一键申购** — 不用你自己对比三个平台，给出"推荐/观望/不建议"的明确结论，确认后直接下单
+1. **量化"安全"到底有多安全** — 用 Polymarket 真金白银投票的概率告诉你，BTC/ETH 跌到某个价位的概率到底是多少
+2. **提前预警波动风险** — Deribit 大型期权到期、CPI/非农/FOMC 等宏观事件
+3. **直接给出推荐** — 不用你自己对比，告诉你"买哪个行权价、为什么"
 
 ---
 
@@ -24,53 +26,28 @@
 
 ```
 Polymarket 概率（主决策）
-  "BTC 3月底跌到 $60K 的概率是 32%"
+  "BTC 在 $68,000 以上的概率是 98%"
   → 真人用真钱投票，比任何模型都真实
          +
 Deribit 期权数据（预警层）
-  "3/27 季度大到期，$55K 有 3,103 BTC 的 PUT OI"
-  → 市场在哪里设了防线，到期日前后要注意
+  "$60,000 有 8,874 BTC 的 PUT OI"
+  → 市场在哪里设了防线
          +
 宏观事件（风控层）
-  "周三有 CPI 数据，建议等公布后再续期"
-  → web search 自动获取，不需要额外 API
+  "周三有 CPI 数据，安全阈值收紧"
+  → web search 自动获取
          ↓
-匹配币安双币赢 → 推荐具体产品 → CONFIRM → 申购
+确定安全区（Polymarket Yes > 85%）→ 选 APR 最高的 → 推荐
 ```
 
-### 为什么需要 Polymarket？
+### 安全评级标准
 
-币安双币赢的 APR 底层是期权定价（Black-Scholes），Deribit 的 PUT 价格也是期权定价。两者同源，对比没意义。
-
-但 Polymarket 是完全不同的市场——预测市场的参与者和期权市场的参与者不一样。当两个独立市场给出一致的判断时，信号更可靠。当它们出现分歧时，就是机会或风险。
-
----
-
-## 数据源
-
-| 数据源 | 需要 Key？ | 用途 |
-|--------|-----------|------|
-| Polymarket Gamma API | ❌ 不需要 | BTC/ETH 各价位的触达概率 |
-| Deribit Public API | ❌ 不需要 | 期权 OI 分布、到期规模、DVOL |
-| Web Search | ❌ 不需要 | 宏观经济日历、财报日历 |
-| Binance API | ✅ 用户自己的 Key | 双币赢产品列表 + 申购 |
-
-**用户只需要一个币安 API Key，其他全部免费公开。**
-
----
-
-## 文件结构
-
-```
-dual-investment-advisor/
-├── SKILL.md                      ← 核心：agent 的决策逻辑
-├── scripts/
-│   └── fetch_data.sh             ← 一键拉取 Deribit + Polymarket 数据
-├── references/
-│   └── api-reference.md          ← API 端点和签名方法参考
-├── README.md                     ← 你正在看的这个
-└── LICENSE                       ← MIT
-```
+| Polymarket Yes 概率 | 安全评级 | 操作建议 |
+|---------------------|---------|---------|
+| > 85% | ⭐⭐⭐⭐⭐ 极安全 | 放心买，选这个区间 APR 最高的 |
+| 70-85% | ⭐⭐⭐⭐ 安全 | 可以买，注意仓位 |
+| 50-70% | ⭐⭐⭐ 中等 | 谨慎，降低行权价或等待 |
+| < 50% | ⭐⭐ 高风险 | 不建议 |
 
 ---
 
@@ -82,104 +59,105 @@ dual-investment-advisor/
 # Mac
 brew install curl jq
 
-# Ubuntu/Linux
-sudo apt install curl jq
+# 安装 Polymarket CLI
+brew tap Polymarket/polymarket-cli https://github.com/Polymarket/polymarket-cli
+brew install polymarket
+
+# 或者手动安装 Polymarket CLI
+mkdir -p ~/.local/bin
+curl -sL "https://github.com/Polymarket/polymarket-cli/releases/download/v0.1.5/polymarket-v0.1.5-aarch64-apple-darwin.tar.gz" -o /tmp/polymarket.tar.gz
+tar -xzf /tmp/polymarket.tar.gz -C /tmp
+mv /tmp/polymarket ~/.local/bin/
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Intel Mac 用这个链接
+# curl -sL "https://github.com/Polymarket/polymarket-cli/releases/download/v0.1.5/polymarket-v0.1.5-x86_64-apple-darwin.tar.gz" -o /tmp/polymarket.tar.gz
 ```
 
-### 2. 安装 Skill
+### 2. 克隆仓库
 
 ```bash
-mkdir -p ~/.openclaw/skills/dual-investment-advisor
-cd ~/.openclaw/skills/dual-investment-advisor
-git clone https://github.com/Giftpaulmo/dual-investment-advisor.git .
-chmod +x scripts/fetch_data.sh
+git clone https://github.com/Giftpaulmo/dual-investment-advisor.git
+cd dual-investment-advisor
+chmod +x fetch_data.sh
 ```
 
-### 3. 配置币安 API Key
-
-在 `openclaw.json` 或 `~/.openclaw/config.json` 中添加：
-
-```json
-{
-  "skills": {
-    "entries": {
-      "dual-investment-advisor": {
-        "enabled": true,
-        "env": {
-          "BINANCE_API_KEY": "你的 API Key",
-          "BINANCE_SECRET_KEY": "你的 Secret Key"
-        }
-      }
-    }
-  }
-}
-```
-
-> ⚠️ 创建 API Key 时：✅ 开启读取 + 现货交易权限，❌ **关闭提现权限**（安全底线）
-
-### 4. 测试
+### 3. 运行
 
 ```bash
-# 测试数据脚本
-bash scripts/fetch_data.sh
-
-# 跟 agent 对话
-# "帮我看看这周 BTC 双币赢买什么好"
+./fetch_data.sh
 ```
-
----
-
-## 使用示例
-
-| 你说 | agent 做什么 |
-|------|-------------|
-| "帮我看看这周双币赢" | 完整周报：概率 + 事件 + 推荐 |
-| "BTC 6万的低买值得买吗" | 针对性分析该行权价的安全度 |
-| "这周有什么风险事件" | 搜索 CPI/非农/FOMC/财报 |
-| "上一期到期了要续吗" | 重新分析市场变化，给续期建议 |
-| "帮我买 $55000 的 BTC 低买" | 展示详情 → 确认风险 → CONFIRM → 申购 |
 
 ### 输出示例
 
 ```
-📊 双币赢周报 — 2026年3月第2周
+══════════════════════════════════════════════
+   双币赢智能顾问 v3.0  2026-03-12 18:37
+══════════════════════════════════════════════
 
-━━ 本周风险日历 ━━
-  周三 3/12 — CPI 数据公布 🔴 高影响
-  3/27 — Q1季度期权大到期 ⚠️ 提前关注
+当前价格: BTC $70,365 | ETH $2,071
 
-━━ Polymarket 概率 (BTC 3月底) ━━
-  ↓$65,000 → 48% | ↓$60,000 → 32% | ↓$55,000 → 14%
+━━ Deribit BTC PUT OI 防线 ━━
+  当前价格: $70365
+  高 OI 行权价（大资金防线）:
+    $60000 | OI: 8874.9 | Distance: 14.7%
+    $55000 | OI: 5120.6 | Distance: 21.8%
 
-━━ BTC 双币赢推荐 ━━
+━━ Polymarket BTC 价格预测 ━━
+    $66000 → Yes: 99% (会涨到) | Vol: $268K | ⭐⭐⭐⭐⭐
+    $68000 → Yes: 98% (会涨到) | Vol: $276K | ⭐⭐⭐⭐⭐
+    $70000 → Yes: 64% (会涨到) | Vol: $325K | ⭐⭐⭐
+    $72000 → Yes: 7% (会涨到) | Vol: $271K | ⭐⭐
 
-🟢 推荐 | 低买 $55,000 | 3天 | APR 8.2%
-  Polymarket 仅 14% 触达 | Deribit 最大 OI 防线
-  ⭐⭐⭐⭐⭐ 极安全
-  → 保守首选
-
-🟡 观望 | 低买 $62,000 | 3天 | APR 35.2%
-  Polymarket 38% 触达 | 本周有 CPI
-  ⭐⭐⭐ 中等
-  → 等 CPI 公布后再考虑
+━━ Polymarket ETH 价格预测 ━━
+    $1900 → Yes: 99% (会涨到) | Vol: $53K | ⭐⭐⭐⭐⭐
+    $2000 → Yes: 96% (会涨到) | Vol: $82K | ⭐⭐⭐⭐⭐
+    $2100 → Yes: 20% (会涨到) | Vol: $63K | ⭐⭐
 ```
+
+**解读**：
+- BTC $68,000 行权价：Polymarket 98% 概率会涨到，⭐⭐⭐⭐⭐ 极安全 → 去币安选这个行权价 APR 最高的
+- ETH $2,000 行权价：Polymarket 96% 概率会涨到，⭐⭐⭐⭐⭐ 极安全 → 推荐
+
+---
+
+## 文件结构
+
+```
+dual-investment-advisor/
+├── fetch_data.sh          ← 数据拉取脚本（Polymarket CLI + Deribit API）
+├── SKILL.md               ← Agent 决策逻辑（给 AI 用的）
+├── README.md              ← 你正在看的这个
+└── LICENSE                ← MIT
+```
+
+---
+
+## 数据源
+
+| 数据源 | 需要 Key？ | 用途 |
+|--------|-----------|------|
+| Polymarket CLI | ❌ 不需要 | BTC/ETH 各价位的触达概率 |
+| Deribit Public API | ❌ 不需要 | 期权 OI 分布、DVOL |
+| Web Search | ❌ 不需要 | 宏观经济日历 |
+| Binance API | ✅ 用户自己的 Key | 双币赢产品列表 + 申购（可选） |
+
+---
+
+## 为什么用 Polymarket？
+
+币安双币赢的 APR 底层是期权定价，Deribit 的 PUT 价格也是期权定价。两者同源，对比没意义。
+
+但 Polymarket 是完全不同的市场——预测市场的参与者和期权市场的参与者不一样。真金白银投票的概率，比任何模型都真实。
 
 ---
 
 ## 安全说明
 
-- API Key 只存在你本地，不上传任何服务器
-- 申购操作必须用户输入 `CONFIRM` 才执行
-- 建议创建 API Key 时 **永远关闭提现权限**
+- 所有数据来自公开 API，不需要你的任何密钥
+- 如果要用币安 API 自动申购，**永远关闭提现权限**
 - 所有分析不构成投资建议，DYOR
-
----
-
-## 参与币安 Skills Hub
-
-本项目是为 [Binance Skills Hub](https://github.com/binance/binance-skills-hub) 活动开发的独立 Skill。
-
-如果你觉得有用，欢迎 Star ⭐ 或提 Issue 反馈。
 
 ---
 
