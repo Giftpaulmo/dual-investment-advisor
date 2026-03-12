@@ -1,134 +1,133 @@
-# dual-investment-advisor: Windows PowerShell 版本 v3.0
-# 用法: powershell -ExecutionPolicy Bypass -File fetch_data.ps1
+# dual-investment-advisor: Windows PowerShell v3.0
+# Usage: powershell -ExecutionPolicy Bypass -File fetch_data.ps1
 
 Write-Host "===============================================" -ForegroundColor Green
-Write-Host "   双币赢智能顾问 v3.0  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Green
+Write-Host "   Dual Investment Advisor v3.0  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Green
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
 
-# 获取当前价格
+# Get current prices
 try {
     $btc_price = [math]::Round((Invoke-RestMethod "https://www.deribit.com/api/v2/public/get_index_price?index_name=btc_usd").result.index_price)
     $eth_price = [math]::Round((Invoke-RestMethod "https://www.deribit.com/api/v2/public/get_index_price?index_name=eth_usd").result.index_price)
-    Write-Host "当前价格: BTC `$$btc_price | ETH `$$eth_price" -ForegroundColor White
+    Write-Host "Current Price: BTC $btc_price | ETH $eth_price" -ForegroundColor White
 } catch {
-    Write-Host "无法获取价格，请检查网络" -ForegroundColor Red
+    Write-Host "Cannot get price, check network" -ForegroundColor Red
     exit 1
 }
 Write-Host ""
 
-# ===== Deribit PUT OI 防线 =====
+# ===== Deribit PUT OI =====
 function Get-DeribitOI {
-    param($currency, $spot_price)
+    param([string]$currency, [int]$spot_price)
 
-    Write-Host "━━ Deribit $currency PUT OI 防线 ━━" -ForegroundColor Cyan
-    Write-Host "  当前价格: `$$spot_price"
-
-    try {
-        $options = (Invoke-RestMethod "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=$currency&kind=option").result
-
-        # 过滤 PUT 期权，计算 OI 和 Distance
-        $puts = $options | Where-Object { $_.instrument_name -match "-P$" } | ForEach-Object {
-            $strike = [int]($_.instrument_name -split "-")[2]
-            $distance = [math]::Round((($spot_price - $strike) / $spot_price) * 100, 1)
-            [PSCustomObject]@{
-                Strike = $strike
-                OI = $_.open_interest
-                Distance = $distance
-            }
-        } | Where-Object { $_.Strike -lt $spot_price } | Sort-Object -Property OI -Descending | Select-Object -First 6
-
-        Write-Host "  高 OI 行权价（大资金防线）:" -ForegroundColor Yellow
-        foreach ($p in $puts) {
-            Write-Host "    `$$($p.Strike) | OI: $($p.OI) | Distance: $($p.Distance)%"
-        }
-    } catch {
-        Write-Host "  无法获取期权数据" -ForegroundColor Red
-    }
-    Write-Host ""
-}
-
-# ===== Polymarket 价格预测 =====
-function Get-PolymarketData {
-    param($coin, $symbol)
-
-    Write-Host "━━ Polymarket $symbol 价格预测 ━━" -ForegroundColor Cyan
+    Write-Host "== Deribit $currency PUT OI ==" -ForegroundColor Cyan
+    Write-Host "  Current: $spot_price"
 
     try {
-        $markets = Invoke-RestMethod "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=200"
+        $url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=" + $currency + "&kind=option"
+        $options = (Invoke-RestMethod $url).result
 
-        # 过滤相关市场
-        $filtered = $markets | Where-Object {
-            $_.question -match "$coin.*above" -and
-            $_.active -eq $true -and
-            $_.closed -eq $false -and
-            $_.outcomePrices -ne $null
-        }
-
-        # 解析并按行权价分组
-        $results = @{}
-        foreach ($m in $filtered) {
-            if ($m.question -match '\$([0-9,]+)') {
-                $strike = [int]($matches[1] -replace ',', '')
-                $prices = $m.outcomePrices | ConvertFrom-Json
-                $yes = [math]::Round($prices[0] * 100)
-                $vol = [math]::Round($m.volume / 1000)
-
-                # 只保留成交量最大的
-                if (-not $results.ContainsKey($strike) -or $results[$strike].Vol -lt $vol) {
-                    $results[$strike] = @{ Yes = $yes; Vol = $vol }
+        $puts = @()
+        foreach ($opt in $options) {
+            if ($opt.instrument_name -match "-P$") {
+                $parts = $opt.instrument_name -split "-"
+                $strike = [int]$parts[2]
+                if ($strike -lt $spot_price) {
+                    $distance = [math]::Round((($spot_price - $strike) / $spot_price) * 100, 1)
+                    $puts += [PSCustomObject]@{
+                        Strike = $strike
+                        OI = $opt.open_interest
+                        Distance = $distance
+                    }
                 }
             }
         }
 
-        # 按行权价排序输出
+        $puts = $puts | Sort-Object -Property OI -Descending | Select-Object -First 6
+
+        Write-Host "  High OI Strikes:" -ForegroundColor Yellow
+        foreach ($p in $puts) {
+            Write-Host "    $($p.Strike) | OI: $($p.OI) | Distance: $($p.Distance)%"
+        }
+    } catch {
+        Write-Host "  Cannot get options data" -ForegroundColor Red
+    }
+    Write-Host ""
+}
+
+# ===== Polymarket =====
+function Get-PolymarketData {
+    param([string]$coin, [string]$symbol)
+
+    Write-Host "== Polymarket $symbol ==" -ForegroundColor Cyan
+
+    try {
+        $url = "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=200"
+        $markets = Invoke-RestMethod $url
+
+        $results = @{}
+        foreach ($m in $markets) {
+            if ($m.question -match "$coin.*above" -and $m.active -eq $true -and $m.closed -eq $false -and $m.outcomePrices -ne $null) {
+                if ($m.question -match '\$(\d[\d,]*)') {
+                    $strike = [int]($matches[1] -replace ',', '')
+                    $prices = $m.outcomePrices | ConvertFrom-Json
+                    $yes = [math]::Round($prices[0] * 100)
+                    $vol = [math]::Round($m.volume / 1000)
+
+                    if (-not $results.ContainsKey($strike) -or $results[$strike].Vol -lt $vol) {
+                        $results[$strike] = @{ Yes = $yes; Vol = $vol }
+                    }
+                }
+            }
+        }
+
         $sorted = $results.GetEnumerator() | Sort-Object { [int]$_.Key }
         foreach ($r in $sorted) {
             $strike = $r.Key
             $yes = $r.Value.Yes
             $vol = $r.Value.Vol
 
-            # 安全评级
             if ($yes -ge 85) {
-                $safety = "[极安全]"
+                $safety = "[SAFE]"
                 $color = "Green"
             } elseif ($yes -ge 70) {
-                $safety = "[安全]"
+                $safety = "[OK]"
                 $color = "Green"
             } elseif ($yes -ge 50) {
-                $safety = "[中等]"
+                $safety = "[MEDIUM]"
                 $color = "Yellow"
             } else {
-                $safety = "[高风险]"
+                $safety = "[RISKY]"
                 $color = "Red"
             }
 
-            Write-Host "    `$$strike -> Yes: $yes% | Vol: `$${vol}K | $safety" -ForegroundColor $color
+            Write-Host "    $strike -> Yes: $yes% | Vol: ${vol}K | $safety" -ForegroundColor $color
         }
     } catch {
-        Write-Host "  无法获取 Polymarket 数据" -ForegroundColor Red
-        Write-Host "  请手动访问: https://polymarket.com/crypto/weekly" -ForegroundColor Yellow
+        Write-Host "  Cannot get Polymarket data" -ForegroundColor Red
+        Write-Host "  Visit: https://polymarket.com/crypto/weekly" -ForegroundColor Yellow
     }
     Write-Host ""
 }
 
-# ===== 执行 =====
+# ===== Run =====
 Get-DeribitOI -currency "BTC" -spot_price $btc_price
 Get-PolymarketData -coin "Bitcoin" -symbol "BTC"
 
 Get-DeribitOI -currency "ETH" -spot_price $eth_price
 Get-PolymarketData -coin "Ethereum" -symbol "ETH"
 
-# ===== 决策指南 =====
-Write-Host "━━ 安全评级标准 ━━" -ForegroundColor Cyan
-Write-Host "  [极安全] Yes > 85% -> 放心买，选 APR 最高的" -ForegroundColor Green
-Write-Host "  [安全]   Yes 70-85% -> 可以买，注意仓位" -ForegroundColor Green
-Write-Host "  [中等]   Yes 50-70% -> 谨慎，降低行权价" -ForegroundColor Yellow
-Write-Host "  [高风险] Yes < 50% -> 不建议" -ForegroundColor Red
+# ===== Guide =====
+Write-Host "== Safety Rating ==" -ForegroundColor Cyan
+Write-Host "  [SAFE]   Yes > 85% -> Buy it, pick highest APR" -ForegroundColor Green
+Write-Host "  [OK]     Yes 70-85% -> Can buy, watch position" -ForegroundColor Green
+Write-Host "  [MEDIUM] Yes 50-70% -> Careful, lower strike" -ForegroundColor Yellow
+Write-Host "  [RISKY]  Yes < 50% -> Not recommended" -ForegroundColor Red
 Write-Host ""
 
-Write-Host "━━ 下一步 ━━" -ForegroundColor Cyan
-Write-Host "  1. 找到安全区（Yes > 85%）里行权价最高的"
-Write-Host "  2. 去币安双币赢，选这个行权价 APR 最高的产品"
-Write-Host "  3. 买入"
+Write-Host "== Next Steps ==" -ForegroundColor Cyan
+Write-Host "  1. Find highest strike in SAFE zone (Yes > 85%)"
+Write-Host "  2. Go to Binance Dual Investment, pick highest APR at that strike"
+Write-Host "  3. Buy"
 Write-Host ""
