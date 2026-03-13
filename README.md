@@ -122,14 +122,35 @@ chmod +x fetch_data.sh
 
 ---
 
+## 两种使用方式
+
+### 方式一：CLI 脚本（手动）
+
+运行 `./fetch_data.sh` 获取数据，然后去币安手动申购。
+
+### 方式二：AI Agent Skill（对话式）
+
+在 Claude Code / Cursor 等支持 Skill 的 Agent 中使用，可以：
+- 自动拉取数据并给出推荐
+- 直接调用币安 API 申购
+- 记录历史战绩和到期提醒
+
+使用方法：
+1. 配置 Binance API Key
+2. 加载 `dual-investment.skill.md`
+3. 对话即可
+
+---
+
 ## 文件结构
 
 ```
 dual-investment-advisor/
-├── fetch_data.sh          ← 数据拉取脚本（Polymarket CLI + Deribit API）
-├── SKILL.md               ← Agent 决策逻辑（给 AI 用的）
-├── README.md              ← 你正在看的这个
-└── LICENSE                ← MIT
+├── fetch_data.sh              ← CLI 数据拉取脚本
+├── dual-investment.skill.md   ← AI Agent Skill（对话式）
+├── SKILL.md                   ← Agent 决策逻辑参考
+├── README.md                  ← 你正在看的这个
+└── LICENSE                    ← MIT
 ```
 
 ---
