@@ -22,6 +22,25 @@
 
 ---
 
+## 架构设计
+
+```
+用户提问 → Agent 加载 Skill → 并行获取数据 → 计算推荐 → 输出结果
+                                    ↓
+                         ┌─────────┼─────────┐
+                         ↓         ↓         ↓
+                   Polymarket  Deribit   Web Search
+                   (概率)      (OI/DVOL)  (宏观日历)
+                         ↓         ↓         ↓
+                         └─────────┼─────────┘
+                                   ↓
+                            决策逻辑（在 Skill 内）
+                                   ↓
+                            推荐/备选/不建议
+                                   ↓
+                         用户确认 → 调币安 API 申购
+```
+
 ## 核心逻辑
 
 ```
@@ -53,41 +72,34 @@ Deribit 期权数据（预警层）
 
 ## 快速开始
 
-### 1. 安装依赖
+### 方式一：AI Agent Skill（推荐）
 
-```bash
-# Mac
-brew install curl jq
-
-# 安装 Polymarket CLI
-brew tap Polymarket/polymarket-cli https://github.com/Polymarket/polymarket-cli
-brew install polymarket
-
-# 或者手动安装 Polymarket CLI
-mkdir -p ~/.local/bin
-curl -sL "https://github.com/Polymarket/polymarket-cli/releases/download/v0.1.5/polymarket-v0.1.5-aarch64-apple-darwin.tar.gz" -o /tmp/polymarket.tar.gz
-tar -xzf /tmp/polymarket.tar.gz -C /tmp
-mv /tmp/polymarket ~/.local/bin/
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-
-# Intel Mac 用这个链接
-# curl -sL "https://github.com/Polymarket/polymarket-cli/releases/download/v0.1.5/polymarket-v0.1.5-x86_64-apple-darwin.tar.gz" -o /tmp/polymarket.tar.gz
-```
-
-### 2. 克隆仓库
-
+1. 下载仓库
 ```bash
 git clone https://github.com/Giftpaulmo/dual-investment-advisor.git
-cd dual-investment-advisor
-chmod +x fetch_data.sh
 ```
 
-### 3. 运行
+2. 在 Claude Code / Cursor 等 Agent 中加载 `dual-investment.skill.md`
+
+3. 提供 Binance API Key（确保关闭提现权限）
+
+4. 开始对话，Agent 会自动给出推荐
+
+### 方式二：CLI 脚本（手动）
 
 ```bash
+# 安装依赖
+brew install curl jq
+
+# 克隆仓库
+git clone https://github.com/Giftpaulmo/dual-investment-advisor.git
+cd dual-investment-advisor
+
+# 运行
 ./fetch_data.sh
 ```
+
+然后去币安手动申购。
 
 ### 输出示例
 
@@ -122,23 +134,15 @@ chmod +x fetch_data.sh
 
 ---
 
-## 两种使用方式
+## 两种使用方式的区别
 
-### 方式一：CLI 脚本（手动）
-
-运行 `./fetch_data.sh` 获取数据，然后去币安手动申购。
-
-### 方式二：AI Agent Skill（对话式）
-
-在 Claude Code / Cursor 等支持 Skill 的 Agent 中使用，可以：
-- 自动拉取数据并给出推荐
-- 直接调用币安 API 申购
-- 记录历史战绩和到期提醒
-
-使用方法：
-1. 配置 Binance API Key
-2. 加载 `dual-investment.skill.md`
-3. 对话即可
+| | CLI 脚本 | AI Agent Skill |
+|---|----------|----------------|
+| 数据获取 | 手动运行脚本 | Agent 自动获取 |
+| 推荐 | 显示数据，自己判断 | 直接给出推荐/备选/不建议 |
+| 申购 | 去币安网页手动操作 | Agent 调 API 自动申购 |
+| 历史记录 | 无 | 自动记录，到期提醒 |
+| 适合 | 想自己分析的用户 | 想省事的用户 |
 
 ---
 
